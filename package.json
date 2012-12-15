@@ -1,0 +1,15 @@
+{
+  "name": "wordpress-image-uploader",
+  "version": "0.1.0",
+  "author": "Alessandro Vendruscolo <alessandro.vendruscolo@gmail.com>",
+  "description": "search for links in posts and uploads them to a CDN",
+  "dependencies" : {
+    "pkgcloud" :  "~0.6",
+    "mysql"   :  "latest"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=0.6"
+  }
+}
+
