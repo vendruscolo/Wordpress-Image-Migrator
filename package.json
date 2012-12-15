@@ -1,11 +1,12 @@
 {
-  "name": "wordpress-image-uploader",
+  "name": "wordpress-image-migrator",
   "version": "0.1.0",
   "author": "Alessandro Vendruscolo <alessandro.vendruscolo@gmail.com>",
-  "description": "search for links in posts and uploads them to a CDN",
+  "description": "Search for posts containing images located in the /wp-content/uploads folder and uploads those images to Rackspace Cloud Files, updating the URL in the database",
   "dependencies" : {
     "pkgcloud" :  "~0.6",
-    "mysql"   :  "latest"
+    "mysql"   :  "latest",
+    "q" : "latest"
   },
   "license": "MIT",
   "engines": {
