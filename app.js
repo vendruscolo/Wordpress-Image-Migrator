@@ -2,6 +2,7 @@ var config = require('./config');
 
 var mysql = require('mysql');
 var Q = require('q');
+var _ = require('underscore');
 
 var mysqlConnection = mysql.createConnection({
     user : config.mysql.user,
@@ -33,7 +34,7 @@ function mysqlConnect() {
 
 // some DB queries
 var allPosts = 'SELECT `ID`, `post_content` FROM `wp_posts` LIMIT 1';
-var rResource = /aa/;
+var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/g;
 
 // let's start
 mysqlConnection().then(getAllPosts).then(processPosts).then(closeConnection, handleError);
@@ -173,8 +174,7 @@ function managePost(post) {
  * @return {Array[String]} an array of resources
  */
 function findResources(postContent) {
-    console.log(postContent);
-    return ['aaa'];
+    return _.uniq(postContent.match(rResource), false);
 }
 
 /**

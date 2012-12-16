@@ -6,7 +6,8 @@
   "dependencies" : {
     "pkgcloud" :  "~0.6",
     "mysql"   :  "latest",
-    "q" : "latest"
+    "q" : "latest",
+    "underscore" : "latest"
   },
   "license": "MIT",
   "engines": {
