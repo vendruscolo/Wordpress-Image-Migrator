@@ -191,8 +191,6 @@ function manageResource(resource) {
     var deferred = Q.defer();
 
     downloadResource(resource).then(uploadResource).then(function (newResource) {
-        console.log('RESOURCE:', resource, ' -> ', newResource);
-
         // resolve the resource's deferred object
         deferred.resolve({
             success : true,
@@ -215,14 +213,29 @@ function manageResource(resource) {
     return deferred.promise;
 }
 
-function downloadResource() {
+/**
+ * Downloads a resource
+ * @param {String} resource the URL of the resource to download
+ * @return {Q.Promise} a promise that will be resolved with the image data or
+ * reject with the error occurred
+ */
+function downloadResource(resource) {
+    console.log('NET: downloading resource', resource);
+
     var deferred = Q.defer();
     deferred.resolve();
     return deferred.promise;
 }
 
-function uploadResource() {
-    console.log('NET: uploading to Rackspace');
+/**
+ * @param {Object} data the data of the image to upload
+ * @param {String} data.URL the URL of the old resource
+ * @param {Buffer} data.data the data of the resource to upload
+ * @return {Q.Promise} a promise that will be resolved with new image's URL or
+ * will be rejected with the error occurred
+ */
+function uploadResource(data) {
+    console.log('NET: uploading to Rackspace', data.URL);
 
     var deferred = Q.defer();
     deferred.resolve('bbbb');
