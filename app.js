@@ -1,9 +1,13 @@
+/*jshint node:true */
+'use strict';
+
 var config = require('./config');
 
 var mysql = require('mysql');
 var Q = require('q');
 var _ = require('underscore');
 
+// mysql connection setup
 var mysqlConnection = mysql.createConnection({
     user : config.mysql.user,
     password : config.mysql.password,
@@ -116,13 +120,13 @@ function managePost(post) {
         found : 0,
         processed : 0,
         failed : 0
-    }
+    };
 
     // get all the (unique) resources in this post
     var resources = findResources(post.post_content);
 
     // early exit :)
-    if (resources.length == 0) {
+    if (resources.length === 0) {
         console.log('Post ', post.ID, ' has no resources');
         deferred.resolve(stats);
     }
@@ -154,7 +158,6 @@ function managePost(post) {
     Q.all(allResourcesProcessed).then(function () {
 
         // update the post using the updates map
-        console.log(updates);
 
         dbUpdated.resolve();
 
@@ -188,6 +191,8 @@ function manageResource(resource) {
     var deferred = Q.defer();
 
     downloadResource(resource).then(uploadResource).then(function (newResource) {
+        console.log('RESOURCE:', resource, ' -> ', newResource);
+
         // resolve the resource's deferred object
         deferred.resolve({
             success : true,
@@ -198,7 +203,7 @@ function manageResource(resource) {
         // either the download or the upload went wrong
 
         // log the error
-        console.error('NET: resource ', resource, ' failed due to error ', error);
+        console.error('NET: resource', resource, ' failed due to error', error);
 
         deferred.resolve({
             success : false,
@@ -217,6 +222,8 @@ function downloadResource() {
 }
 
 function uploadResource() {
+    console.log('NET: uploading to Rackspace');
+
     var deferred = Q.defer();
     deferred.resolve('bbbb');
     return deferred.promise;
@@ -229,10 +236,10 @@ function updatePost() {
 }
 
 function closeConnection(stats) {
-    console.log('\n\nPROCESS COMPLETED\n', stats);
-
     mysqlConnection.end(function () {
         console.log('MYSQL: connection closed');
+
+        console.log('\n\nPROCESS COMPLETED\n', stats);
         exit(0);
     });
 }
