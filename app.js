@@ -9,6 +9,7 @@ var _ = require('underscore');
 var request = require('request');
 var path = require('path');
 var fs = require('fs');
+var cloudfiles = require('cloudfiles');
 
 // mysql connection setup
 var mysqlConnection = mysql.createConnection({
@@ -39,12 +40,100 @@ function mysqlConnect() {
     return deferred.promise;
 }
 
+// Rackspace connection setup
+var rackspaceClient = cloudfiles.createClient({
+    auth : {
+        username : config.rackspace.username,
+        apiKey : config.rackspace.apiKey
+    }
+});
+
 // some DB queries
 var allPosts = 'SELECT `ID`, `post_content` FROM `wp_posts` LIMIT 1';
 var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/g;
+var rackspaceBucketName = config.rackspace.bucketName;
+var rackspaceCDNURL = '';
 
 // let's start
-mysqlConnection().then(getAllPosts).then(processPosts).then(closeConnection, handleError);
+mysqlConnect().then(rackspaceLogin).then(getCDNURL).then(getAllPosts).then(processPosts).then(closeConnection, handleError);
+
+/**
+ * Connects to the database
+ * @return {Q.Promise} a promise that will be resolved once the connection
+ * has been established
+ */
+function mysqlConnect() {
+    var deferred = Q.defer();
+
+    mysqlConnection.connect(function (error) {
+        if (error) {
+            deferred.reject(error);
+        } else {
+            console.log('MYSQL: connection established');
+            deferred.resolve();
+        }
+    });
+
+    return deferred.promise;
+}
+
+/**
+ * Authenticates with Rackspace
+ * @return {Q.Promise} a promise that will be resolved once the client
+ * has been authenticated
+ */
+function rackspaceLogin() {
+    var deferred = Q.defer();
+
+    rackspaceClient.setAuth(function (error, response, auth) {
+        if (error) {
+            deferred.reject(error);
+        } else {
+            console.log('NET: Rackspace auth token received');
+            deferred.resolve();
+        }
+    });
+
+    return deferred.promise;
+}
+
+/**
+ * Gets the CDN URL of the container
+ * @return {Q.Promise} a promise that will be resolved once the CDN URL is retrieved
+ */
+function getCDNURL() {
+    var deferred = Q.defer();
+
+    rackspaceClient.getContainer(rackspaceBucketName, true, function (error, container) {
+        if (error) {
+            deferred.reject(error);
+        } else {
+            rackspaceCDNURL = container.cdnUri;
+            deferred.resolve();
+        }
+    });
+
+    return deferred.promise;
+}
+
+/**
+ * Gets the CDN URL of the container
+ * @return {Q.Promise} a promise that will be resolved once the CDN URL is retrieved
+ */
+function getCDNURL() {
+    var deferred = Q.defer();
+
+    rackspaceClient.getContainer(rackspaceBucketName, true, function (error, container) {
+        if (error) {
+            deferred.reject(error);
+        } else {
+            rackspaceCDNURL = container.cdnUri;
+            deferred.resolve();
+        }
+    });
+
+    return deferred.promise;
+}
 
 /**
  * Queries the db, retrieving all the posts
@@ -267,15 +356,34 @@ function downloadResource(data) {
 /**
  * @param {Object} data the data of the image to upload
  * @param {String} data.URL the URL of the old resource
- * @param {Buffer} data.data the data of the resource to upload
+ * @param {Buffer} data.path the path of the resource to upload
  * @return {Q.Promise} a promise that will be resolved with new image's URL or
  * will be rejected with the error occurred
  */
 function uploadResource(data) {
     console.log('NET: uploading to Rackspace', data.URL);
 
+    // this deferred object will take care of the upload process
     var deferred = Q.defer();
-    deferred.resolve('bbbb');
+
+    // the base name of the file, used to name the remote file and to construct
+    // the CDN URL
+    var basename = path.basename(data.path);
+
+    rackspaceClient.addFile(rackspaceBucketName, {
+        remote: basename,
+        local: data.path
+    }, function (error, uploaded) {
+        // remove the temporary file
+        fs.unlink(data.path);
+
+        if (error) {
+            deferred.reject(error);
+        } else {
+            deferred.resolve(rackspaceCDNURL + '/' + basename);
+        }
+    });
+
     return deferred.promise;
 }
 

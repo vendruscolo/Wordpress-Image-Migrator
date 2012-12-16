@@ -5,5 +5,10 @@
         "host" : "127.0.0.1",
         "port" : "/tmp/mysql.sock",
         "database" : "wp_production"
+    },
+    "rackspace" : {
+        "username" : "rackspace username",
+        "apiKey" : "rackspace API key",
+        "bucketName" : "rackspace bucket name"
     }
 }
