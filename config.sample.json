@@ -1,0 +1,9 @@
+{
+    "mysql" : {
+        "user" : "mysql username",
+        "password" : "mysql passord",
+        "host" : "127.0.0.1",
+        "port" : "/tmp/mysql.sock",
+        "database" : "wp_production"
+    }
+}
