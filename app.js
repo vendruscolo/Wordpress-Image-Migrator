@@ -6,6 +6,9 @@ var config = require('./config');
 var mysql = require('mysql');
 var Q = require('q');
 var _ = require('underscore');
+var request = require('request');
+var path = require('path');
+var fs = require('fs');
 
 // mysql connection setup
 var mysqlConnection = mysql.createConnection({
@@ -122,8 +125,14 @@ function managePost(post) {
         failed : 0
     };
 
-    // get all the (unique) resources in this post
-    var resources = findResources(post.post_content);
+    // get all the (unique) resources in this post and save them in an array
+    // of objects, containing both the post id and the resource URL
+    var resources = findResources(post.post_content).map(function (resource) {
+        return {
+            postID : post.ID,
+            resourceURL : resource
+        };
+    });
 
     // early exit :)
     if (resources.length === 0) {
@@ -182,30 +191,34 @@ function findResources(postContent) {
 
 /**
  * Manages the download and upload process of a resource
- * @param {String} resource the url of the resource
+ * @param {Object} data the object representing the resource to manage
+ * @param {String} data.postID the ID of the post which the resource belongs to
+ * @param {String} data.resourceURL the url of the resource
  * @return {Q.Promise} a promise that will be resolved once the process completes
  * of fails (it won't get rejected)
  */
-function manageResource(resource) {
+function manageResource(data) {
     // this deferred object manages the single resource process
     var deferred = Q.defer();
 
-    downloadResource(resource).then(uploadResource).then(function (newResource) {
+    downloadResource(data).then(uploadResource).then(function (newResourceURL) {
+        console.log('RESOURCE:', data.resourceURL, ' -> ', newResourceURL);
+
         // resolve the resource's deferred object
         deferred.resolve({
             success : true,
-            oldURL : resource,
-            newURL : newResource
+            oldURL : data.resourceURL,
+            newURL : newResourceURL
         });
     }, function (error) {
         // either the download or the upload went wrong
 
         // log the error
-        console.error('NET: resource', resource, ' failed due to error', error);
+        console.error('NET: resource', data.resourceURL, ' failed due to error', error);
 
         deferred.resolve({
             success : false,
-            oldURL : resource,
+            oldURL : data.resourceURL,
             newURL : null
         });
     });
@@ -215,15 +228,39 @@ function manageResource(resource) {
 
 /**
  * Downloads a resource
- * @param {String} resource the URL of the resource to download
+ * @param {Object} data the object representing the resource to manage
+ * @param {String} data.postID the ID of the post which the resource belongs to
+ * @param {String} data.resourceURL the url of the resource
  * @return {Q.Promise} a promise that will be resolved with the image data or
  * reject with the error occurred
  */
-function downloadResource(resource) {
-    console.log('NET: downloading resource', resource);
+function downloadResource(data) {
+    console.log('NET: downloading resource', data.resourceURL);
 
+    // this deferred object will take care of the download process
     var deferred = Q.defer();
-    deferred.resolve();
+
+    var remoteFilename = path.basename(data.resourceURL);
+    var localFilename = '/tmp/' + data.postID + '_' + remoteFilename;
+
+    var stream = fs.createWriteStream(localFilename);
+
+    // download the resource
+    request(data.resourceURL).pipe(stream);
+
+    // an error occurred
+    stream.on('error', function (error) {
+        deferred.reject(error);
+    });
+
+    // the file has been saved
+    stream.on('close', function () {
+        deferred.resolve({
+            URL : data.resourceURL,
+            path : localFilename
+        });
+    });
+
     return deferred.promise;
 }
 

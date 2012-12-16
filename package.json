@@ -7,7 +7,8 @@
     "pkgcloud" :  "~0.6",
     "mysql"   :  "latest",
     "q" : "latest",
-    "underscore" : "latest"
+    "underscore" : "latest",
+    "request" : "latest"
   },
   "license": "MIT",
   "engines": {
