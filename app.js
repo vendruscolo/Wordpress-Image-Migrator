@@ -252,6 +252,7 @@ function managePost(post) {
     Q.all(allResourcesProcessed).then(function () {
 
         // update the post using the updates map
+        var newContent = replaceResources(post.ID, post.post_content, updates);
 
         dbUpdated.resolve();
 
@@ -385,10 +386,37 @@ function uploadResource(resource, localPath) {
     return deferred.promise;
 }
 
-function updatePost() {
-    var deferred = Q.defer();
-    deferred.resolve();
-    return deferred.promise;
+/**
+ * Updates the content of a post, replacing the old resources with the new ones
+ * @param {String} postId the ID of the post currently processed
+ * @param {String} postContent the html content of the post
+ * @param {Object} updates the updates to do on the post. It's a map of old
+ * resources -> new resources
+ * @return {String} the new content
+ */
+function replaceResources(postID, postContent, updates) {
+    var keys = Object.keys(updates);
+
+    // early exit
+    if (keys.length === 0) {
+        console.log('UPDATE: Post', postID, 'had no resources to update');
+        return postContent;
+    }
+
+    var newContent = postContent;
+
+    keys.forEach(function (oldResource, index, array) {
+        // String.replace replaces only the first occurrence
+
+        while (newContent.indexOf(oldResource) >= 0) {
+            newContent = newContent.replace(oldResource, updates[oldResource]);
+        }
+
+    });
+
+    console.log('UPDATE: Post', postID, 'updated', keys.length, 'resources');
+
+    return newContent;
 }
 
 function closeConnection(stats) {
