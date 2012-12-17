@@ -49,7 +49,7 @@ var rackspaceClient = cloudfiles.createClient({
 });
 
 // some DB queries
-var allPosts = 'SELECT `ID`, `post_content` FROM `wp_posts` LIMIT 1';
+var allPostsQuery = 'SELECT `ID`, `post_content` FROM `wp_posts` LIMIT 1';
 var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/g;
 var rackspaceBucketName = config.rackspace.bucketName;
 var rackspaceCDNURL = '';
@@ -144,7 +144,7 @@ function getAllPosts() {
     var deferred = Q.defer();
 
     // query the db and pass over the result
-    mysqlConnection.query(allPosts, function (error, rows) {
+    mysqlConnection.query(allPostsQuery, function (error, rows) {
         if (error) {
             deferred.reject(error);
         } else {
@@ -215,17 +215,11 @@ function managePost(post) {
     };
 
     // get all the (unique) resources in this post and save them in an array
-    // of objects, containing both the post id and the resource URL
-    var resources = findResources(post.post_content).map(function (resource) {
-        return {
-            postID : post.ID,
-            resourceURL : resource
-        };
-    });
+    var resources = findResources(post.post_content);
 
     // early exit :)
     if (resources.length === 0) {
-        console.log('Post ', post.ID, ' has no resources');
+        console.log('POST: Post', post.ID, 'has no resources');
         deferred.resolve(stats);
     }
 
@@ -233,14 +227,16 @@ function managePost(post) {
     var updates = {};
 
     // create an array of promises, one per resource
-    var allResourcesProcessed = resources.map(manageResource);
+    var allResourcesProcessed = resources.map(function (resource) {
+        return manageResource(post.ID, resource);
+    });
 
     // handle the resources result, updating the updates map if succeded
     allResourcesProcessed.forEach(function (promise, index, array) {
         promise.then(function (result) {
             stats.found++;
             if (result.success) {
-                updates[result.oldURL] = result.newURL;
+                updates[result.oldResource] = result.newResource;
                 stats.processed++;
             } else {
                 stats.failed++;
@@ -280,35 +276,36 @@ function findResources(postContent) {
 
 /**
  * Manages the download and upload process of a resource
- * @param {Object} data the object representing the resource to manage
- * @param {String} data.postID the ID of the post which the resource belongs to
- * @param {String} data.resourceURL the url of the resource
+ * @param {String} postID the ID of the post which the resource belongs to
+ * @param {String} resource the resource to manage
  * @return {Q.Promise} a promise that will be resolved once the process completes
  * of fails (it won't get rejected)
  */
-function manageResource(data) {
+function manageResource(postID, resource) {
     // this deferred object manages the single resource process
     var deferred = Q.defer();
 
-    downloadResource(data).then(uploadResource).then(function (newResourceURL) {
-        console.log('RESOURCE:', data.resourceURL, ' -> ', newResourceURL);
+    downloadResource(postID, resource).then(function (result) {
+        return uploadResource(result.resource, result.path);
+    }).then(function (newResource) {
+        console.log('RESOURCE:', resource, ' -> ', newResource);
 
         // resolve the resource's deferred object
         deferred.resolve({
             success : true,
-            oldURL : data.resourceURL,
-            newURL : newResourceURL
+            oldResource : resource,
+            newResource : newResource
         });
     }, function (error) {
         // either the download or the upload went wrong
 
-        // log the error
-        console.error('NET: resource', data.resourceURL, ' failed due to error', error);
-
+        // resolve rather than reject the deferred object. Just log the error
+        // so that it'll be analyzed later. In this way the process can
+        // continue with the other resources
         deferred.resolve({
             success : false,
-            oldURL : data.resourceURL,
-            newURL : null
+            oldResource : resource,
+            newResource : null
         });
     });
 
@@ -317,25 +314,24 @@ function manageResource(data) {
 
 /**
  * Downloads a resource
- * @param {Object} data the object representing the resource to manage
- * @param {String} data.postID the ID of the post which the resource belongs to
- * @param {String} data.resourceURL the url of the resource
+ * @param {String} postID the ID of the post which the resource belongs to
+ * @param {String} resource the resource to download
  * @return {Q.Promise} a promise that will be resolved with the image data or
  * reject with the error occurred
  */
-function downloadResource(data) {
-    console.log('NET: downloading resource', data.resourceURL);
+function downloadResource(postID, resource) {
+    console.log('NET: downloading resource', resource);
 
     // this deferred object will take care of the download process
     var deferred = Q.defer();
 
-    var remoteFilename = path.basename(data.resourceURL);
-    var localFilename = '/tmp/' + data.postID + '_' + remoteFilename;
+    var remoteFilename = path.basename(resource);
+    var localPath = '/tmp/' + postID + '_' + remoteFilename;
 
-    var stream = fs.createWriteStream(localFilename);
+    var stream = fs.createWriteStream(localPath);
 
     // download the resource
-    request(data.resourceURL).pipe(stream);
+    request(resource).pipe(stream);
 
     // an error occurred
     stream.on('error', function (error) {
@@ -344,9 +340,11 @@ function downloadResource(data) {
 
     // the file has been saved
     stream.on('close', function () {
+        console.log('NET: downloaded resource', resource);
+
         deferred.resolve({
-            URL : data.resourceURL,
-            path : localFilename
+            resource : resource,
+            path : localPath
         });
     });
 
@@ -354,32 +352,32 @@ function downloadResource(data) {
 }
 
 /**
- * @param {Object} data the data of the image to upload
- * @param {String} data.URL the URL of the old resource
- * @param {Buffer} data.path the path of the resource to upload
- * @return {Q.Promise} a promise that will be resolved with new image's URL or
+ * @param {String} resource the old resource which has been downloaded
+ * @param {String} localPath filesystem's path of the resource to upload
+ * @return {Q.Promise} a promise that will be resolved with new resource or
  * will be rejected with the error occurred
  */
-function uploadResource(data) {
-    console.log('NET: uploading to Rackspace', data.URL);
+function uploadResource(resource, localPath) {
+    console.log('NET: uploading to Rackspace', resource);
 
     // this deferred object will take care of the upload process
     var deferred = Q.defer();
 
     // the base name of the file, used to name the remote file and to construct
     // the CDN URL
-    var basename = path.basename(data.path);
+    var basename = path.basename(localPath);
 
     rackspaceClient.addFile(rackspaceBucketName, {
         remote: basename,
-        local: data.path
+        local: localPath
     }, function (error, uploaded) {
         // remove the temporary file
-        fs.unlink(data.path);
+        fs.unlink(localPath);
 
         if (error) {
             deferred.reject(error);
         } else {
+            console.log('NET: uploaded to Rackspace resource', resource);
             deferred.resolve(rackspaceCDNURL + '/' + basename);
         }
     });
