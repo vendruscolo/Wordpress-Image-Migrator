@@ -67,6 +67,7 @@ var rackspaceBucketName = config.rackspace.bucketName;
 var rackspaceCDNURL = '';
 
 // let's start
+var processStarted = new Date();
 mysqlConnect().then(rackspaceLogin).then(getCDNURL).then(getAllPosts).then(processPosts).then(closeConnection, handleError);
 
 /**
@@ -481,7 +482,8 @@ function closeConnection(stats) {
     mysqlConnection.end(function () {
         console.log('MYSQL: connection closed');
 
-        console.log('\n\nPROCESS COMPLETED\n', stats);
+        console.log('\n\nPROCESS COMPLETED\nIt took roughly',
+                    ((new Date() - processStarted) / 1000) | 0, 'seconds\nStats:', stats);
         exit(0);
     });
 }
