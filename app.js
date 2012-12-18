@@ -273,6 +273,7 @@ function managePost(post) {
 
         // whoops, an error occurred at the DB level, delete the resources from
         // Rackspace
+        deleteResources();
 
         // but resolve anyway, so that we can continue with other posts
         deferred.resolve(stats);
@@ -459,6 +460,21 @@ function updatePost(postID, newContent) {
     });
 
     return deferred.promise;
+}
+
+/**
+ * Deletes resources from Rackspace
+ * @param {Array[String]} resources an array of resources to delete
+ */
+function deleteResources(resources) {
+    // just delete, without a great error policy: just log the error
+    resources.forEach(function (resource, index, array) {
+        rackspaceClient.destroyFile(rackspaceBucketName, resource, function (error, result) {
+            if (error) {
+                console.log('NET: couldn\'t delete resource', resource);
+            }
+        });
+    });
 }
 
 function closeConnection(stats) {
