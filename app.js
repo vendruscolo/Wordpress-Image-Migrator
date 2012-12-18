@@ -40,6 +40,17 @@ function mysqlConnect() {
     return deferred.promise;
 }
 
+// custom query format
+mysqlConnection.config.queryFormat = function (query, values) {
+  if (!values) return query;
+  return query.replace(/\:(\w+)/g, function (txt, key) {
+    if (values.hasOwnProperty(key)) {
+      return this.escape(values[key]);
+    }
+    return txt;
+  }.bind(this));
+};
+
 // Rackspace connection setup
 var rackspaceClient = cloudfiles.createClient({
     auth : {
@@ -50,6 +61,7 @@ var rackspaceClient = cloudfiles.createClient({
 
 // some DB queries
 var allPostsQuery = 'SELECT `ID`, `post_content` FROM `wp_posts` LIMIT 1';
+var updatePostContentQuery = 'UPDATE `wp_posts` SET `post_content` = :postContent WHERE ID = :postID';
 var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/g;
 var rackspaceBucketName = config.rackspace.bucketName;
 var rackspaceCDNURL = '';
@@ -244,23 +256,27 @@ function managePost(post) {
         });
     });
 
-    // when all the post's resources have been migrated, we need to update the
-    // post in the db. This deferred object will tell when it happens
-    var dbUpdated = Q.defer();
-
     // update the db
     Q.all(allResourcesProcessed).then(function () {
 
         // update the post using the updates map
-        var newContent = replaceResources(post.ID, post.post_content, updates);
+        return replaceResources(post.ID, post.post_content, updates);
 
-        dbUpdated.resolve();
+    }).then(function (newContent) {
+        return updatePost(post.ID, newContent);
+    }).then(function () {
 
-    });
-
-    // once the db has been updated, 'return' to the caller
-    dbUpdated.promise.then(function () {
+        // ok, the post has been correctly updated in the db
         deferred.resolve(stats);
+
+    }, function (error) {
+
+        // whoops, an error occurred at the DB level, delete the resources from
+        // Rackspace
+
+        // but resolve anyway, so that we can continue with other posts
+        deferred.resolve(stats);
+
     });
 
     return deferred.promise;
@@ -417,6 +433,32 @@ function replaceResources(postID, postContent, updates) {
     console.log('UPDATE: Post', postID, 'updated', keys.length, 'resources');
 
     return newContent;
+}
+
+/**
+ * Updates a given post in the database
+ * @param {String} postID the ID of the post to update
+ * @param {String} newContent the new content of the post
+ */
+function updatePost(postID, newContent) {
+    var deferred = Q.defer();
+
+    mysqlConnection.query(updatePostContentQuery, {
+        postID : postID,
+        postContent : newContent
+    }, function (error, result) {
+        if (error) {
+            console.log('MYSQL: update failed due to error', error);
+
+            deferred.reject(error);
+        } else {
+            console.log('MYSQL: correctly updated post', postID);
+
+            deferred.resolve();
+        }
+    });
+
+    return deferred.promise;
 }
 
 function closeConnection(stats) {
