@@ -332,7 +332,9 @@ function downloadResource(postID, resource) {
     var stream = fs.createWriteStream(localPath);
 
     // download the resource
-    request(resource).pipe(stream);
+    request(resource).pipe(stream).on('error', function (error) {
+        deferred.reject(error);
+    });
 
     // an error occurred
     stream.on('error', function (error) {
