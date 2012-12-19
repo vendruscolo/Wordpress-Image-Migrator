@@ -130,25 +130,6 @@ function getCDNURL() {
 }
 
 /**
- * Gets the CDN URL of the container
- * @return {Q.Promise} a promise that will be resolved once the CDN URL is retrieved
- */
-function getCDNURL() {
-    var deferred = Q.defer();
-
-    rackspaceClient.getContainer(rackspaceBucketName, true, function (error, container) {
-        if (error) {
-            deferred.reject(error);
-        } else {
-            rackspaceCDNURL = container.cdnUri;
-            deferred.resolve();
-        }
-    });
-
-    return deferred.promise;
-}
-
-/**
  * Queries the db, retrieving all the posts
  * @return {Q.Promise} a promise that will be resolved once the driver returns
  * the posts
