@@ -344,6 +344,7 @@ function downloadResource(postID, resource) {
     // this deferred object will take care of the download process
     var deferred = Q.defer();
 
+    var resource = resource.indexOf('http') === 0 ? resource : 'http://www.macstories.net' +  resource;
     var remoteFilename = path.basename(resource);
     var localPath = '/tmp/' + postID + '_' + remoteFilename;
 
