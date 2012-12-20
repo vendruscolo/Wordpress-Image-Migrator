@@ -307,6 +307,7 @@ function manageResource(postID, resource) {
         });
     }, function (error) {
         // either the download or the upload went wrong
+        console.log('RESOURCE:', resource, 'of post', postID, 'failed due to error', error);
 
         // resolve rather than reject the deferred object. Just log the error
         // so that it'll be analyzed later. In this way the process can
