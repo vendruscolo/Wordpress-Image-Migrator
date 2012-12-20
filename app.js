@@ -167,23 +167,32 @@ function processPosts(posts) {
     // (all posts' resources have been migrated to Rackspace)
     var deferred = Q.defer();
 
-    // each post has a promise that will be resolved once the process has been
-    // completed (which means that all its resources have been downloaded,
-    // uploaded to Rackspace, and the post itself has been updated in the db)
-    var allPostsProcessed = posts.map(managePost);
+    // process the first posts. lastResult is a promise
+    var lastResult = managePost(posts[0]);
 
-    // update the stats every time a post has been migrated
-    allPostsProcessed.forEach(function (promise, index, array) {
-        promise.then(function (result) {
+    // for each of the remaining posts, process it after the previous
+    // one has been processed. This could be written using reduce
+    posts.slice(1).forEach(function(post, index, array) {
+        // update the last promise
+        lastResult = lastResult.then(function (result) {
+            // this post has been processed, so update the stats
             stats.resourcesFound += result.found;
             stats.resourcesProcessed += result.processed;
             stats.resourcesFailed += result.failed;
+
+            // manage the next post
+            return managePost(post);
         });
     });
 
-    // once all post have been processed, 'return' to the caller with
-    // the stats about the process
-    Q.all(allPostsProcessed).then(function () {
+    // do the same with the last post, which has no next posts
+    lastResult.then(function (result) {
+        // update the stats for the last element
+        stats.resourcesFound += result.found;
+        stats.resourcesProcessed += result.processed;
+        stats.resourcesFailed += result.failed;
+
+        // all the posts have been processed, our work is finished
         deferred.resolve(stats);
     });
 
