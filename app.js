@@ -62,7 +62,7 @@ var rackspaceClient = cloudfiles.createClient({
 // some DB queries
 var allPostsQuery = 'SELECT `ID`, `post_content` FROM `wp_posts`';
 var updatePostContentQuery = 'UPDATE `wp_posts` SET `post_content` = :postContent WHERE ID = :postID';
-var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/g;
+var rResource = /(http:\/\/(www\.)?macstories.net)?\/(stuff|wp-content\/uploads)\/.+?\.(jpe?g|gif|png|zip|rar|gz)/gi;
 var rackspaceBucketName = config.rackspace.bucketName;
 var rackspaceCDNURL = '';
 
